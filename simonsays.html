@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Simon Says — Memory Game</title>
+
+<!-- Game-appropriate retro font -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+
+<style>
+  /* ============================================================
+     THEME VARIABLES
+     Each theme defines pad colours (normal + lit), a glow, and
+     a background gradient. Switching themes = switching variables.
+     ============================================================ */
+  :root {
+    --font-retro: 'Press Start 2P', cursive;
+
+    /* default = Classic */
+    --pad-0: #e63946;  --pad-0-lit: #ff6b75;
+    --pad-1: #2563eb;  --pad-1-lit: #60a5fa;
+    --pad-2: #22c55e;  --pad-2-lit: #86efac;
+    --pad-3: #eab308;  --pad-3-lit: #fde047;
+    --glow: rgba(229, 57, 53, 0.55);
+    --accent: #e63946;
+    --bg-hi: #171a2e;
+    --bg-lo: #0b0d1a;
+  }
+
+  /* ---------- Classic ---------- */
+  body[data-theme="classic"] {
+    --pad-0: #e63946; --pad-0-lit: #ff6b75;
+    --pad-1: #2563eb; --pad-1-lit: #60a5fa;
+    --pad-2: #22c55e; --pad-2-lit: #86efac;
+    --pad-3: #eab308; --pad-3-lit: #fde047;
+    --glow: rgba(230, 57, 70, .55);
+    --accent: #e63946;
+    --bg-hi: #171a2e; --bg-lo: #0b0d1a;
+  }
+
+  /* ---------- Neon ---------- */
+  body[data-theme="neon"] {
+    --pad-0: #ff2d95; --pad-0-lit: #ff8ac4;
+    --pad-1: #00e5ff; --pad-1-lit: #80f5ff;
+    --pad-2: #9d4edd; --pad-2-lit: #c77dff;
+    --pad-3: #b6ff2e; --pad-3-lit: #dcff8f;
+    --glow: rgba(0, 229, 255, .55);
+    --accent: #00e5ff;
+    --bg-hi: #1d0a2e; --bg-lo: #090312;
+  }
+
+  /* ---------- Sunset ---------- */
+  body[data-theme="sunset"] {
+    --pad-0: #ff6b35; --pad-0-lit: #ffa27a;
+    --pad-1: #ff3366; --pad-1-lit: #ff85a1;
+    --pad-2: #7b2ff7; --pad-2-lit: #a97fff;
+    --pad-3: #ffd166; --pad-3-lit: #ffe6a3;
+    --glow: rgba(255, 107, 53, .55);
+    --accent: #ff6b35;
+    --bg-hi: #2b1220; --bg-lo: #120610;
+  }
+
+  /* ============================================================
+     BASE LAYOUT
+     ============================================================ */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    min-height: 100vh;
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    color: #e8eaf6;
+    background: linear-gradient(160deg, var(--bg-hi) 0%, var(--bg-lo) 100%);
+    display: flex;
+    justify-content: center;
+    padding: 32px 16px 60px;
+    transition: background 400ms ease;
+  }
+
+  .wrapper { width: 100%; max-width: 720px; }
+
+  /* ============================================================
+     HEADER
+     ============================================================ */
+  header { text-align: center; margin-bottom: 28px; }
+
+  header h1 {
+    font-family: var(--font-retro);
+    font-size: clamp(1.6rem, 5vw, 2.5rem);
+    letter-spacing: 2px;
+    color: #fff;
+    text-shadow: 0 0 18px var(--glow), 0 4px 0 rgba(0,0,0,.35);
+  }
+
+  header .subtitle {
+    margin-top: 12px;
+    font-size: .85rem;
+    color: #9aa0b5;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+
+  /* ============================================================
+     THEME SELECTOR
+     ============================================================ */
+  .theme-selector { margin-bottom: 28px; }
+
+  .theme-selector h2,
+  .how-to-play h2 {
+    font-size: .8rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #8d93ab;
+    margin-bottom: 12px;
+    text-align: center;
+  }
+
+  .themes {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .theme-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    border: 2px solid rgba(255,255,255,.12);
+    border-radius: 14px;
+    background: rgba(255,255,255,.04);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: .85rem;
+    color: #d5d8e6;
+    transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+  }
+
+  .theme-card:hover { transform: translateY(-2px); border-color: rgba(255,255,255,.35); }
+  .theme-card.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 14px var(--glow);
+    color: #fff;
+  }
+
+  .theme-card .dots { display: flex; gap: 4px; }
+  .theme-card .dot { width: 14px; height: 14px; border-radius: 50%; }
+
+  .theme-card.classic .dot:nth-child(1) { background: #e63946; }
+  .theme-card.classic .dot:nth-child(2) { background: #2563eb; }
+  .theme-card.classic .dot:nth-child(3) { background: #22c55e; }
+  .theme-card.classic .dot:nth-child(4) { background: #eab308; }
+
+  .theme-card.neon .dot:nth-child(1) { background: #ff2d95; }
+  .theme-card.neon .dot:nth-child(2) { background: #00e5ff; }
+  .theme-card.neon .dot:nth-child(3) { background: #9d4edd; }
+  .theme-card.neon .dot:nth-child(4) { background: #b6ff2e; }
+
+  .theme-card.sunset .dot:nth-child(1) { background: #ff6b35; }
+  .theme-card.sunset .dot:nth-child(2) { background: #ff3366; }
+  .theme-card.sunset .dot:nth-child(3) { background: #7b2ff7; }
+  .theme-card.sunset .dot:nth-child(4) { background: #ffd166; }
+
+  /* ============================================================
+     SIMON BOARD
+     ============================================================ */
+  .game-area { display: flex; flex-direction: column; align-items: center; }
+
+  .simon-board {
+    position: relative;
+    width: min(92vw, 420px);
+    aspect-ratio: 1 / 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 12px;
+    padding: 14px;
+    background: rgba(255,255,255,.04);
+    border: 2px solid rgba(255,255,255,.08);
+    border-radius: 30px;
+    box-shadow: 0 24px 60px rgba(0,0,0,.45), inset 0 0 0 4px rgba(0,0,0,.25);
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .simon-board.shake { animation: shake .45s ease; }
+
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    20% { transform: translateX(-8px); }
+    40% { transform: translateX(8px); }
+    60% { transform: translateX(-6px); }
+    80% { transform: translateX(6px); }
+  }
+
+  /* ----- individual pads ----- */
+  .pad {
+    position: relative;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    background: var(--pad-color);
+    box-shadow:
+      inset 0 -12px 0 rgba(0,0,0,.28),
+      inset 0 8px 0 rgba(255,255,255,.14),
+      0 6px 18px rgba(0,0,0,.3);
+    transition: background .12s ease, box-shadow .12s ease, transform .08s ease;
+    touch-action: manipulation;
+    outline: none;
+  }
+
+  /* pad colors come from theme variables */
+  .pad[data-index="0"] { --pad-color: var(--pad-0); --pad-lit: var(--pad-0-lit); }
+  .pad[data-index="1"] { --pad-color: var(--pad-1); --pad-lit: var(--pad-1-lit); }
+  .pad[data-index="2"] { --pad-color: var(--pad-2); --pad-lit: var(--pad-2-lit); }
+  .pad[data-index="3"] { --pad-color: var(--pad-3); --pad-lit: var(--pad-3-lit); }
+
+  .pad.lit {
+    background: var(--pad-lit);
+    box-shadow:
+      inset 0 -12px 0 rgba(0,0,0,.12),
+      inset 0 8px 0 rgba(255,255,255,.35),
+      0 0 30px var(--glow),
+      0 0 60px var(--glow);
+  }
+
+  .pad:active:not(:disabled) { transform: scale(.96); }
+  .pad:focus-visible { box-shadow: 0 0 0 4px var(--accent); }
+
+  /* ----- center status circle ----- */
+  .center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 34%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: #10131f;
+    border: 4px solid rgba(255,255,255,.15);
+    box-shadow: 0 8px 24px rgba(0,0,0,.5), inset 0 0 18px rgba(0,0,0,.7);
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    text-align: center;
+    padding: 8px;
+  }
+
+  .center .status {
+    font-family: var(--font-retro);
+    font-size: clamp(.5rem, 2.4vw, .72rem);
+    line-height: 1.5;
+    color: #fff;
+    text-shadow: 0 0 10px var(--glow);
+  }
+
+  .center .round {
+    font-family: var(--font-retro);
+    font-size: clamp(.85rem, 4vw, 1.2rem);
+    color: var(--accent);
+    text-shadow: 0 0 12px var(--glow);
+  }
+
+  .center .led {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #444;
+    box-shadow: none;
+    transition: background .2s ease, box-shadow .2s ease;
+  }
+  .center .led.on { background: var(--accent); box-shadow: 0 0 12px var(--glow); }
+
+  /* ============================================================
+     STATS + CONTROLS
+     ============================================================ */
+  .stats {
+    display: flex;
+    gap: 24px;
+    justify-content: center;
+    margin: 24px 0 18px;
+    font-family: var(--font-retro);
+    font-size: .7rem;
+    color: #9aa0b5;
+  }
+  .stats b { color: #fff; }
+
+  .controls { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+
+  .btn {
+    font-family: var(--font-retro);
+    font-size: .72rem;
+    padding: 14px 22px;
+    border: none;
+    border-radius: 14px;
+    cursor: pointer;
+    background: var(--accent);
+    color: #0b0d1a;
+    box-shadow: 0 6px 0 rgba(0,0,0,.35);
+    transition: transform .1s ease, box-shadow .1s ease, filter .15s ease;
+  }
+  .btn:hover { filter: brightness(1.12); }
+  .btn:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,.35); }
+
+  .btn.secondary {
+    background: rgba(255,255,255,.08);
+    color: #e0e3f0;
+    border: 2px solid rgba(255,255,255,.15);
+    box-shadow: none;
+  }
+  .btn.secondary:hover { background: rgba(255,255,255,.16); }
+
+  .btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+
+  /* ============================================================
+     HOW TO PLAY
+     ============================================================ */
+  .how-to-play {
+    margin-top: 40px;
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 22px;
+    padding: 24px;
+  }
+
+  .how-to-play ol {
+    list-style: none;
+    counter-reset: step;
+    display: grid;
+    gap: 14px;
+  }
+
+  .how-to-play li {
+    counter-increment: step;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    font-size: .92rem;
+    line-height: 1.6;
+    color: #c3c7d8;
+  }
+
+  .how-to-play li::before {
+    content: counter(step);
+    flex: 0 0 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #0b0d1a;
+    font-family: var(--font-retro);
+    font-size: .6rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 2px;
+    box-shadow: 0 0 12px var(--glow);
+  }
+
+  .how-to-play .tip {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px dashed rgba(255,255,255,.12);
+    font-size: .8rem;
+    color: #8d93ab;
+  }
+
+  /* small fade-in for UI feedback */
+  .pulse { animation: pulse .5s ease; }
+  @keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+    100% { transform: scale(1); }
+  }
+</style>
+</head>
+<body data-theme="classic">
+
+<div class="wrapper">
+
+  <!-- ============ HEADER ============ -->
+  <header>
+    <h1>SIMON SAYS</h1>
+    <p class="subtitle">Watch &nbsp;•&nbsp; Remember &nbsp;•&nbsp; Repeat</p>
+  </header>
+
+  <!-- ============ THEME SELECTOR ============ -->
+  <section class="theme-selector" aria-label="Choose theme">
+    <h2>🎨 Choose your theme</h2>
+    <div class="themes">
+      <button class="theme-card classic active" data-theme="classic" type="button">
+        <span class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span></span>
+        Classic
+      </button>
+      <button class="theme-card neon" data-theme="neon" type="button">
+        <span class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span></span>
+        Neon
+      </button>
+      <button class="theme-card sunset" data-theme="sunset" type="button">
+        <span class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span></span>
+        Sunset
+      </button>
+    </div>
+  </section>
+
+  <!-- ============ GAME BOARD ============ -->
+  <section class="game-area">
+    <div class="simon-board" id="board">
+
+      <!-- four pads (0 = top-left, 1 = top-right, 2 = bottom-left, 3 = bottom-right) -->
+      <button class="pad" data-index="0" aria-label="Pad 0"></button>
+      <button class="pad" data-index="1" aria-label="Pad 1"></button>
+      <button class="pad" data-index="2" aria-label="Pad 2"></button>
+      <button class="pad" data-index="3" aria-label="Pad 3"></button>
+
+      <!-- center status circle -->
+      <div class="center">
+        <div class="led" id="led"></div>
+        <div class="status" id="status">READY</div>
+        <div class="round" id="round">—</div>
+      </div>
+    </div>
+
+    <!-- stats -->
+    <div class="stats">
+      <span>ROUND <b id="roundCount">0</b></span>
+      <span>BEST <b id="bestScore">0</b></span>
+    </div>
+
+    <!-- controls -->
+    <div class="controls">
+      <button class="btn" id="startBtn" type="button">▶ START</button>
+      <button class="btn secondary" id="resetBtn" type="button">↺ RESET</button>
+    </div>
+  </section>
+
+  <!-- ============ HOW TO PLAY ============ -->
+  <section class="how-to-play">
+    <h2>ℹ️ How to Play</h2>
+    <ol>
+      <li>Press <b>Start</b> to begin. Simon will light up one pad and play its tone.</li>
+      <li>Memorise the sequence — it grows by one new pad every round.</li>
+      <li>When the LED turns green (Your turn), repeat the sequence by tapping the pads in the exact same order.</li>
+      <li>Finish the sequence correctly to advance to the next round, where one more step is added.</li>
+      <li>Tap a wrong pad and the game ends. Beat your <b>Best</b> score to set a new record!</li>
+    </ol>
+    <p class="tip">💡 Tip: Say the colours out loud as they appear — it's a proven memory trick. Sounds can be muted by your device's volume control.</p>
+  </section>
+
+</div>
+
+<script>
+/* ================================================================
+   SIMON SAYS — GAME LOGIC
+   ----------------------------------------------------------------
+   State machine:
+     idle    -> waiting for Start
+     showing  -> computer plays the sequence (player input locked)
+     turn     -> player's turn to repeat
+     over     -> wrong pad pressed, game finished
+   ================================================================ */
+
+(() => {
+  "use strict";
+
+  /* ---------- DOM references ---------- */
+  const board     = document.getElementById("board");
+  const pads      = Array.from(document.querySelectorAll(".pad"));
+  const led       = document.getElementById("led");
+  const statusEl  = document.getElementById("status");
+  const roundEl   = document.getElementById("round");
+  const roundTxt  = document.getElementById("roundCount");
+  const bestTxt   = document.getElementById("bestScore");
+  const startBtn  = document.getElementById("startBtn");
+  const resetBtn  = document.getElementById("resetBtn");
+  const themeBtns = Array.from(document.querySelectorAll(".theme-card"));
+
+  /* ---------- Audio: Web Audio API tones (C major arpeggio) ---------- */
+  let audioCtx = null;
+  const FREQS = [261.63, 329.63, 392.00, 523.25]; // C4 E4 G4 C5
+
+  function initAudio() {
+    if (!audioCtx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) audioCtx = new AC();
+    }
+    if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+  }
+
+  function playTone(index, duration = 0.35) {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.type = "sine";
+    osc.frequency.value = FREQS[index];
+    const t = audioCtx.currentTime;
+    // quick attack + smooth release to avoid clicks
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.35, t + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+    osc.start(t);
+    osc.stop(t + duration + 0.05);
+  }
+
+  /* ---------- Persistence (best score + chosen theme) ---------- */
+  const store = {
+    get(key, fallback) {
+      try { return localStorage.getItem("simon-" + key) ?? fallback; }
+      catch { return fallback; }
+    },
+    set(key, val) {
+      try { localStorage.setItem("simon-" + key, val); } catch { /* ignore */ }
+    }
+  };
+
+  /* ---------- Theme switching ---------- */
+  function applyTheme(name) {
+    document.body.dataset.theme = name;
+    themeBtns.forEach(b => b.classList.toggle("active", b.dataset.theme === name));
+    store.set("theme", name);
+  }
+
+  themeBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      applyTheme(btn.dataset.theme);
+      // flash the pads so the new colours are instantly visible
+      pads.forEach(p => { p.classList.add("lit"); setTimeout(() => p.classList.remove("lit"), 320); });
+    });
+  });
+
+  /* ---------- Game state ---------- */
+  const state = {
+    sequence: [],   // array of pad indices (0-3)
+    playerIndex: 0, // next index the player must press
+    turn: "idle",   // idle | showing | turn | over
+    round: 0,
+    best: parseInt(store.get("best", "0"), 10) || 0
+  };
+
+  bestTxt.textContent = state.best;
+
+  /* ---------- Small helpers ---------- */
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const randomPad = () => Math.floor(Math.random() * 4);
+
+  function setStatus(text, round = null) {
+    statusEl.textContent = text;
+    if (round !== null) {
+      roundEl.textContent = round;
+      roundTxt.textContent = round;
+    }
+  }
+
+  function setLed(on) {
+    led.classList.toggle("on", on);
+  }
+
+  /* Light a pad visually + play its tone. */
+  function lightPad(index, duration = 0.35) {
+    playTone(index, duration);
+    pads[index].classList.add("lit");
+    return sleep(duration * 1000).then(() => pads[index].classList.remove("lit"));
+  }
+
+  /* ---------- Core game flow ---------- */
+
+  // Computer plays the entire sequence, then unlocks player input.
+  async function playSequence() {
+    state.turn = "showing";
+    setLed(false);
+    setStatus("WATCH…", state.round);
+    pads.forEach(p => (p.disabled = true));
+
+    for (let i = 0; i < state.sequence.length; i++) {
+      await lightPad(state.sequence[i]);
+      await sleep(250); // gap between flashes
+    }
+
+    // player's turn
+    state.turn = "turn";
+    state.playerIndex = 0;
+    setLed(true);
+    setStatus("YOUR TURN", state.round);
+    pads.forEach(p => (p.disabled = false));
+  }
+
+  // Start / restart a fresh game.
+  async function startGame() {
+    initAudio();
+    state.sequence = [];
+    state.round = 1;
+    state.playerIndex = 0;
+    state.sequence.push(randomPad());
+    setStatus("GO!", 1);
+    await sleep(500);
+    await playSequence();
+  }
+
+  // Player pressed a pad — validate it against the sequence.
+  async function handlePadPress(index) {
+    if (state.turn !== "turn") return;  // ignore clicks while computer plays / idle
+
+    // visual + audio feedback for the press
+    const p = pads[index];
+    p.classList.add("lit");
+    playTone(index);
+    setTimeout(() => p.classList.remove("lit"), 250);
+
+    // wrong pad -> game over
+    if (index !== state.sequence[state.playerIndex]) {
+      return gameOver();
+    }
+
+    state.playerIndex++;
+
+    // completed the whole sequence -> advance a round
+    if (state.playerIndex === state.sequence.length) {
+      state.round++;
+      setStatus("NICE!", state.round);
+      setLed(false);
+      pads.forEach(x => (x.disabled = true));
+      await sleep(700);
+      state.sequence.push(randomPad()); // grow the pattern
+      await playSequence();
+    }
+  }
+
+  // Wrong answer — flash an error, shake the board, update best score.
+  async function gameOver() {
+    state.turn = "over";
+    setLed(false);
+    pads.forEach(p => (p.disabled = true));
+
+    board.classList.add("shake");
+    playTone(2, 0.5); // low error tone handled below with a quick buzz
+    // buzz: short descending blip for the error
+    if (audioCtx) {
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.connect(g); g.connect(audioCtx.destination);
+      o.type = "sawtooth"; o.frequency.setValueAtTime(160, audioCtx.currentTime);
+      o.frequency.exponentialRampToValueAtTime(60, audioCtx.currentTime + 0.4);
+      g.gain.setValueAtTime(0.15, audioCtx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.4);
+      o.start(); o.stop(audioCtx.currentTime + 0.45);
+    }
+
+    // record best score (best = max round reached)
+    const reached = state.round - 1;
+    if (reached > state.best) {
+      state.best = reached;
+      store.set("best", String(state.best));
+      bestTxt.textContent = state.best;
+      bestTxt.parentElement.classList.add("pulse");
+      setTimeout(() => bestTxt.parentElement.classList.remove("pulse"), 500);
+    }
+
+    await sleep(450);
+    board.classList.remove("shake");
+    pads.forEach(p => p.classList.add("lit"));
+    await sleep(400);
+    pads.forEach(p => p.classList.remove("lit"));
+
+    setStatus("YOU LOST!", reached);
+    startBtn.textContent = "↻ PLAY AGAIN";
+    startBtn.disabled = false;
+  }
+
+  /* ---------- Controls ---------- */
+  startBtn.addEventListener("click", () => {
+    startBtn.disabled = true;
+    startBtn.textContent = "▶ START";
+    startGame();
+  });
+
+  resetBtn.addEventListener("click", () => {
+    // stop everything and return to idle
+    state.turn = "idle";
+    state.sequence = [];
+    state.round = 0;
+    state.playerIndex = 0;
+    pads.forEach(p => { p.disabled = false; p.classList.remove("lit"); });
+    board.classList.remove("shake");
+    setLed(false);
+    setStatus("READY", "—");
+    startBtn.disabled = false;
+    startBtn.textContent = "▶ START";
+  });
+
+  // pad clicks
+  pads.forEach(pad => {
+    pad.addEventListener("click", () => handlePadPress(parseInt(pad.dataset.index, 10)));
+  });
+
+  /* ---------- Init: load saved theme ---------- */
+  const savedTheme = store.get("theme", "classic");
+  if (["classic", "neon", "sunset"].includes(savedTheme)) applyTheme(savedTheme);
+})();
+</script>
+</body>
+</html>
